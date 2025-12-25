@@ -1,4 +1,4 @@
-import { RunState } from './types';
+import { RunState } from './types.js';
 
 export function calculateScore(state: RunState): number {
   let score = 0;

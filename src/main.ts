@@ -7,7 +7,7 @@ import type { Action } from './engine/types';
 let state = loadGameState() || createInitialRunState(Date.now().toString());
 
 // Auth
-import { initAuth, clerk } from './auth';
+import { initAuth, clerk, getToken } from './auth';
 
 // App Element
 const app = document.getElementById('app');
@@ -37,7 +37,13 @@ function dispatch(action: Action) {
   // Clear save on game over (party death)
   if (state.gameOver) {
     clearGameState();
-    // TODO: Clear remote save?
+    // Submit score on death
+    (async () => {
+        const token = await getToken();
+        if (token) {
+            await apiClient.submitScore(token, state);
+        }
+    })();
   } else {
     saveGameState(state);
     syncSave(); // Fire and forget
