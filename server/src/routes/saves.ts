@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { pool } from '../db';
-import { generateSaveHash } from '../utils/hash';
+import { pool } from '../db.js';
+import { generateSaveHash } from '../utils/hash.js';
 import { requireAuth } from '@clerk/express';
 
 const router = Router();
