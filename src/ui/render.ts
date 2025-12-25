@@ -176,7 +176,9 @@ export function renderGame(state: RunState): string {
     <div class="header">
       <div class="header-top">
          <h1>The Long Hall</h1>
-         <div class="auth-controls">
+         <div class="header-controls">
+             <button id="btn-leaderboard" class="btn-sm">🏆 High Scores</button>
+             <div class="auth-controls">
             ${clerk.user 
                 ? `<span class="user-tag">👤 ${clerk.user.firstName}</span> <button id="btn-logout" class="btn-sm">Logout</button>`
                 : `<button id="btn-login" class="btn-sm btn-primary">Login / Sign Up</button>`
