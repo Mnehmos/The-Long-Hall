@@ -954,9 +954,12 @@ export function gameReducer(state: RunState, action: Action): RunState {
     }
     
     case 'HIRE_RECRUIT': {
-        const recruit = RECRUITS.find(r => r.id === action.recruitId);
+        const room = state.currentRoom;
+        // Find recruit from room's available recruits (or fallback to RECRUITS for compatibility)
+        const recruit = room?.availableRecruits?.find(r => r.id === action.recruitId)
+            || RECRUITS.find(r => r.id === action.recruitId);
         if (!recruit) return state;
-        
+
         // Check gold
         if (state.party.gold < recruit.cost) {
             return {
@@ -964,7 +967,7 @@ export function gameReducer(state: RunState, action: Action): RunState {
                 history: [...state.history, `Not enough gold to hire ${recruit.name}. Need ${recruit.cost} gold.`]
             };
         }
-        
+
         // Check party size (max 4)
         if (state.party.members.length >= 4) {
             return {
@@ -972,7 +975,7 @@ export function gameReducer(state: RunState, action: Action): RunState {
                 history: [...state.history, 'Party is full! Max 4 members.']
             };
         }
-        
+
         // Create new party member
         const newMember = createActor(
             `party-${state.party.members.length + 1}`,
@@ -980,15 +983,22 @@ export function gameReducer(state: RunState, action: Action): RunState {
             recruit.role,
             1 // Start at level 1
         );
-        
+
+        // Update room to remove hired recruit
+        const newRoom = room && room.availableRecruits ? {
+            ...room,
+            availableRecruits: room.availableRecruits.filter(r => r.id !== action.recruitId)
+        } : room;
+
         return {
             ...state,
+            currentRoom: newRoom,
             party: {
                 ...state.party,
                 gold: state.party.gold - recruit.cost,
                 members: [...state.party.members, newMember]
             },
-        history: [...state.history, `${recruit.name} joins the party!`]
+            history: [...state.history, `${recruit.name} joins the party!`]
         };
     }
     

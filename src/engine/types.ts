@@ -46,6 +46,15 @@ export interface Enemy {
   xp: number;
 }
 
+// Recruit definition (for intermission rooms)
+export interface RecruitOption {
+  id: string;
+  name: string;
+  role: 'fighter' | 'wizard' | 'rogue' | 'cleric';
+  cost: number;
+  description: string;
+}
+
 // Room definition
 export interface Room {
   id: string;
@@ -54,6 +63,7 @@ export interface Room {
   enemies: Enemy[];
   loot: Item[];
   shopItems?: Item[]; // For trader/intermission rooms
+  availableRecruits?: RecruitOption[]; // For intermission rooms
 }
 
 // Equipment Slots

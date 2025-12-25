@@ -1,6 +1,6 @@
 import { SeededRNG } from '../core/rng';
 import type { RunState, Room, RoomType } from './types';
-import { getRoomWeights, ENEMIES, ITEMS } from '../content/tables';
+import { getRoomWeights, ENEMIES, ITEMS, RECRUITS } from '../content/tables';
 import { getThemeDef } from './generateTheme';
 import { hashWithSeed } from '../core/hash';
 
@@ -234,7 +234,13 @@ export function generateRoom(state: RunState, rng?: SeededRNG): Room {
         const shuffled = [...ITEMS].sort(() => rng.float() - 0.5);
         room.shopItems = shuffled.slice(0, 4);
     }
-    
+
+    // Generate available recruits for intermission rooms
+    if (type === 'intermission') {
+        const shuffledRecruits = [...RECRUITS].sort(() => rng.float() - 0.5);
+        room.availableRecruits = shuffledRecruits.slice(0, 2);
+    }
+
     return room;
 }
 

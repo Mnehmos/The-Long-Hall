@@ -2,7 +2,7 @@ import type { RunState, Item } from '../engine/types';
 import { clerk } from '../auth';
 import { getAbilityById } from '../content/abilities';
 import { getEnemyArt, getHeroArt, renderHpBar, renderStatBar, EQUIPMENT_ICONS } from '../content/art';
-import { RECRUITS, ITEMS } from '../content/tables';
+import { ITEMS } from '../content/tables';
 import { calculateEscapeDC } from '../engine/generateRoom';
 import type { ScoreEntry } from '../api/client';
 
@@ -106,19 +106,23 @@ function renderShopSection(state: RunState): string {
 }
 
 function renderRecruitSection(state: RunState): string {
-    // Pick 2 random recruits
-    const shuffled = [...RECRUITS].sort(() => Math.random() - 0.5);
-    const available = shuffled.slice(0, 2);
-    
+    // Use room's pre-generated recruits
+    const room = state.currentRoom;
+    const available = room?.availableRecruits || [];
+
+    if (available.length === 0) {
+        return `<div class="recruit-section"><h4>🧑‍🤝‍🧑 Recruits</h4><p>No recruits available.</p></div>`;
+    }
+
     let html = `<div class="recruit-section">
         <h4>🧑‍🤝‍🧑 Recruits Available</h4>
         <div class="recruit-list">`;
-    
+
     for (const recruit of available) {
         const canAfford = state.party.gold >= recruit.cost;
         const partyFull = state.party.members.length >= 4;
         const disabled = !canAfford || partyFull ? 'disabled' : '';
-        
+
         html += `
         <div class="recruit-card ${disabled}">
             <div class="recruit-name">${recruit.name}</div>
@@ -128,7 +132,7 @@ function renderRecruitSection(state: RunState): string {
             <button class="btn-hire" data-recruit="${recruit.id}" ${disabled}>Hire</button>
         </div>`;
     }
-    
+
     html += `</div></div>`;
     return html;
 }
