@@ -90,6 +90,13 @@ body {
   color: var(--primary-color);
 }
 
+/* Header Controls */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .auth-controls {
   display: flex;
   align-items: center;

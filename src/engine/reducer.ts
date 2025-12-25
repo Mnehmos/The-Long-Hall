@@ -464,9 +464,20 @@ export function gameReducer(state: RunState, action: Action): RunState {
          
         const newParty = { ...state.party };
         newParty.members = [...state.party.members];
+        
+        // Calculate HP Difference
+        const oldMaxHpBonus = (oldItem?.baseStats?.maxHpBonus || 0) + (oldItem?.enchantment?.effect?.maxHpBonus || 0);
+        const newMaxHpBonus = (item.baseStats.maxHpBonus || 0) + (item.enchantment?.effect?.maxHpBonus || 0);
+        const hpDiff = newMaxHpBonus - oldMaxHpBonus;
+
         newParty.members[actorIndex] = {
             ...actor,
-            equipment: newEquipment
+            equipment: newEquipment,
+            hp: {
+                ...actor.hp,
+                max: actor.hp.max + hpDiff,
+                current: actor.hp.current + hpDiff
+            }
         };
 
         return {
@@ -496,9 +507,18 @@ export function gameReducer(state: RunState, action: Action): RunState {
         
         const newParty = { ...state.party };
         newParty.members = [...state.party.members];
+        
+        // Calculate HP Difference (Negative)
+        const removedMaxHpBonus = (item.baseStats.maxHpBonus || 0) + (item.enchantment?.effect?.maxHpBonus || 0);
+        
         newParty.members[actorIndex] = {
             ...actor,
-            equipment: newEquipment
+            equipment: newEquipment,
+            hp: {
+                ...actor.hp,
+                max: actor.hp.max - removedMaxHpBonus,
+                current: Math.max(1, actor.hp.current - removedMaxHpBonus) // Don't kill on unequip? Or allow it? simplified: min 1
+            }
         };
         
         return {
