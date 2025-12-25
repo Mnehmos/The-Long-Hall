@@ -30,3 +30,8 @@ campaign_data.redb
 campaign_data.redb.lock
 nul
 
+# Env
+.env
+.env.*
+!.env.example
+
