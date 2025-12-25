@@ -118,7 +118,25 @@ export function gameReducer(state: RunState, action: Action): RunState {
             newHistory.push(`☠️ ${deadNames.join(', ')} left behind forever...`);
         }
         newHistory.push(`Entered room ${newDepth}: ${room.type.toUpperCase()}`);
-        if (isCombat) {
+
+        // Roll initiative for combat
+        let combatTurn: 'player' | 'enemy' | null = isCombat ? 'player' : null;
+        if (isCombat && room.enemies.length > 0) {
+            // Roll initiative: party uses highest agility member, enemies use highest power
+            const partyAgility = Math.max(...updatedMembers.filter(m => m.isAlive).map(m => m.skills?.agility || 0), 0);
+            const enemyPower = Math.max(...room.enemies.map(e => e.power), 0);
+
+            const partyInit = roll('1d20').total + partyAgility;
+            const enemyInit = roll('1d20').total + Math.floor(enemyPower / 2);
+
+            newHistory.push(`⚔️ Initiative: Party ${partyInit} vs Enemies ${enemyInit}`);
+
+            if (enemyInit > partyInit) {
+                combatTurn = 'enemy';
+                newHistory.push(`Enemies act first!`);
+            } else {
+                newHistory.push(`Party acts first!`);
+            }
             newHistory.push('━━━ ROUND 1 ━━━');
         }
 
@@ -127,7 +145,7 @@ export function gameReducer(state: RunState, action: Action): RunState {
           depth: newDepth,
           currentRoom: room,
           roomResolved: room.type !== 'combat' && room.type !== 'elite' && room.type !== 'hazard' && room.type !== 'shrine' && room.type !== 'trader',
-          combatTurn: isCombat ? 'player' : null,
+          combatTurn,
           combatRound: isCombat ? 1 : 0,
           actedThisRound: [], // Reset for new combat
           extraActions: 0, // Reset extra actions on room enter
@@ -139,6 +157,11 @@ export function gameReducer(state: RunState, action: Action): RunState {
         // Long rest at segment boundaries
         if (newDepth > 0 && newDepth % 10 === 0) {
              nextState = performLongRest(nextState, rng);
+        }
+
+        // If enemies won initiative, resolve their turn immediately
+        if (combatTurn === 'enemy') {
+            nextState = resolveEnemyTurn(nextState);
         }
 
         return nextState;
@@ -221,7 +244,20 @@ export function gameReducer(state: RunState, action: Action): RunState {
         let newEnemies = [...room.enemies];
         let newParty = { ...state.party };
         let roomResolved = false;
-        let newActedThisRound = [...(state.actedThisRound || []), action.attackerId]; // Track this attacker
+
+        // Check if this attacker already acted and is using an extra action
+        const alreadyActed = (state.actedThisRound || []).includes(action.attackerId);
+        let newExtraActions = state.extraActions || 0;
+        let newActedThisRound = [...(state.actedThisRound || [])];
+
+        if (alreadyActed && newExtraActions > 0) {
+            // Using an extra action - consume it, don't add to actedThisRound again
+            newExtraActions -= 1;
+            newHistory.push(`(Using extra action! ${newExtraActions > 0 ? newExtraActions + ' remaining' : ''})`);
+        } else {
+            // Normal action - track this attacker
+            newActedThisRound.push(action.attackerId);
+        }
         
         if (hit) {
             // Damage roll: 1d8 + skill + weapon
@@ -357,19 +393,16 @@ export function gameReducer(state: RunState, action: Action): RunState {
         // Determine if all alive party members have acted
         const aliveMemberIds = newParty.members.filter(m => m.isAlive).map(m => m.id);
         const allActed = aliveMemberIds.every(id => newActedThisRound.includes(id));
-        
+
         // Default: stay on player turn until all have acted
         let combatTurn: 'player' | 'enemy' | null = allActed ? 'enemy' : 'player';
-        
-        // Check if player has extra actions (e.g., from Action Surge)
-        let newExtraActions = state.extraActions;
-        if (combatTurn === 'enemy' && state.extraActions > 0) {
-            // Consume extra action instead of ending turn
-            newExtraActions = state.extraActions - 1;
+
+        // If there are extra actions remaining, stay on player turn
+        if (combatTurn === 'enemy' && newExtraActions > 0) {
             combatTurn = 'player';
-            newHistory.push(`(Extra action used! ${newExtraActions > 0 ? newExtraActions + ' remaining' : 'Turn ends after this.'})`);
+            newHistory.push(`(Extra action available!)`);
         }
-        
+
         // If still more party members to act, show who's next
         if (combatTurn === 'player' && !allActed) {
             const nextToAct = newParty.members.find(m => m.isAlive && !newActedThisRound.includes(m.id));

@@ -7,16 +7,7 @@ import { calculateEscapeDC } from '../engine/generateRoom';
 import type { ScoreEntry } from '../api/client';
 
 // UI State (not game state - just for navigation)
-let selectedPartyIndex = 0;
 let cachedHighScores: ScoreEntry[] = [];
-
-export function setSelectedPartyIndex(index: number) {
-  selectedPartyIndex = index;
-}
-
-export function getSelectedPartyIndex(): number {
-  return selectedPartyIndex;
-}
 
 export function setCachedHighScores(scores: ScoreEntry[]) {
   cachedHighScores = scores;
@@ -154,7 +145,7 @@ function renderItemStats(item: Item): string {
 
 function renderSidebar(state: RunState): string {
     let html = `<div class="sidebar-left">`;
-    
+
     // ASCII Header
     html += `
     <div class="sidebar-header">
@@ -169,21 +160,32 @@ function renderSidebar(state: RunState): string {
         // XP Bar
         const XP_THRESHOLDS = [0, 50, 150, 300, 500, 800, 1200];
         const nextXp = member.level < XP_THRESHOLDS.length - 1 ? XP_THRESHOLDS[member.level] : XP_THRESHOLDS[XP_THRESHOLDS.length - 1];
-        
+
+        // Calculate HP percentage for color
+        const hpPercent = member.hp.current / member.hp.max;
+        let hpColor = '';
+        if (!member.isAlive) {
+            hpColor = 'color: #666;'; // Gray for dead
+        } else if (hpPercent <= 0.25) {
+            hpColor = 'color: #ff3333;'; // Red when critical
+        } else if (hpPercent <= 0.5) {
+            hpColor = 'color: #ff8800;'; // Orange when low
+        } else if (hpPercent <= 0.75) {
+            hpColor = 'color: #ffcc00;'; // Yellow when moderate
+        }
+
         const hpBar = renderStatBar(member.hp.current, member.hp.max, 10, '█', '░');
         const xpBar = renderStatBar(member.xp, nextXp, 10, '▒', '░');
-        
+
         const statusIcons = member.statuses?.map(s => {
             if (s === 'hidden') return '👁️‍🗨️';
             return '•';
         }).join('') || '';
 
-        const isSelected = index === selectedPartyIndex;
-        const selectedClass = isSelected ? 'selected' : '';
         const deadClass = !member.isAlive ? 'dead' : '';
 
         html += `
-        <div class="sidebar-member ${deadClass} ${selectedClass}" data-party-index="${index}">
+        <div class="sidebar-member ${deadClass}" data-party-index="${index}" style="${hpColor}">
             <div class="sidebar-name">${member.name} <span style="float:right">${member.isAlive ? 'Lv.'+member.level : 'DEAD'}</span></div>
             <div class="sidebar-status-ascii">
  HP [${hpBar}]
@@ -192,10 +194,7 @@ function renderSidebar(state: RunState): string {
             </div>
         </div>`;
     });
-    
-    // Navigation hint
-    html += `<div class="party-nav-hint"><kbd>←</kbd> <kbd>→</kbd> Navigate</div>`;
-    
+
     html += `</div>`;
     return html;
 }
@@ -231,6 +230,7 @@ export function renderGame(state: RunState): string {
                 : `<button id="btn-login" class="btn-sm btn-primary">Login / Sign Up</button>`
             }
          </div>
+      </div>
       </div>
       <div class="stats">
         <span class="stat-depth">🗺️ Depth: ${state.depth}</span>
@@ -294,31 +294,46 @@ export function renderGame(state: RunState): string {
       if ((room.type === 'combat' || room.type === 'elite') && room.enemies.length > 0) {
           // Combat in progress - show each party member's actions
           html += `<div class="combat-panel">`;
-          
+
           // Show attack options for each alive party member
           const aliveMembers = state.party.members.filter(m => m.isAlive);
+          const actedThisRound = state.actedThisRound || [];
+
+          // Check if there are extra actions available (from Action Surge)
+          const hasExtraActions = (state.extraActions || 0) > 0;
+
           for (const member of aliveMembers) {
-              html += `<div class="member-actions">`;
+              const hasActed = actedThisRound.includes(member.id);
+              // If extra actions available, acted members can act again
+              const canAct = !hasActed || hasExtraActions;
+              const actedClass = (hasActed && !hasExtraActions) ? 'acted' : '';
+
+              html += `<div class="member-actions ${actedClass}">`;
               const statusText = member.statuses?.includes('hidden') ? ' <span class="status-hidden">(Hidden)</span>' : '';
-              html += `<div class="member-name">${member.name} (${member.role})${statusText}</div>`;
-              
-              // Attack buttons
+              const actedText = hasActed && !hasExtraActions ? ' <span class="status-acted">(Done)</span>' : '';
+              const surgeText = hasActed && hasExtraActions ? ' <span class="status-surge">(Surging!)</span>' : '';
+              html += `<div class="member-name">${member.name} (${member.role})${statusText}${actedText}${surgeText}</div>`;
+
+              // Attack buttons - disabled if already acted (unless extra actions available)
               html += `<div class="member-targets">`;
               room.enemies.forEach((e) => {
-                  html += `<button class="btn-attack" data-attacker="${member.id}" data-target="${e.id}">⚔️ Attack ${e.name}</button>`;
+                  const disabled = canAct ? '' : 'disabled';
+                  html += `<button class="btn-attack" data-attacker="${member.id}" data-target="${e.id}" ${disabled}>⚔️ Attack ${e.name}</button>`;
               });
               html += `</div>`;
-              
+
               // Ability buttons
               if (member.abilities && member.abilities.length > 0) {
                   html += `<div class="member-abilities">`;
                   for (const abilityState of member.abilities) {
                       const ability = getAbilityById(abilityState.abilityId);
                       if (!ability) continue;
-                      
+
                       const isReady = abilityState.currentCooldown === 0;
-                      // Special check for Sneak Attack
-                      let isUsable = isReady;
+                      // Action Surge can be used even after acting (it grants extra action)
+                      const isFreeAction = ability.id === 'action_surge' || ability.id === 'cunning_action' || ability.id === 'camouflage';
+                      // Check if usable: ready AND (can act OR is a free action)
+                      let isUsable = isReady && (canAct || isFreeAction);
                       let extraText = '';
                       if (ability.id === 'sneak_attack' && !member.statuses?.includes('hidden')) {
                            isUsable = false;
@@ -329,7 +344,7 @@ export function renderGame(state: RunState): string {
                       const cooldownText = isReady ? '' : (abilityState.currentCooldown >= 999 ? ' (Rest)' : ` (${abilityState.currentCooldown})`);
                       const disabled = isUsable ? '' : 'disabled';
                       const btnClass = isUsable ? 'btn-ability' : 'btn-ability cooldown';
-                      
+
                       // For abilities that target enemies, show enemy selector
                       if (ability.effect.target === 'enemy') {
                           room.enemies.forEach((e) => {
@@ -834,7 +849,7 @@ function renderGameOver(state: RunState): string {
           <h4>💀 Death Recap</h4>
           <div class="death-log-content">${deathLog}</div>
         </div>
-        <p class="death-final-message">Refresh the page to start a new run.</p>
+        <button id="btn-restart" class="btn-restart">🔄 Start New Run</button>
       </div>
     </div>
     `;

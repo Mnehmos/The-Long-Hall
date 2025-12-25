@@ -452,6 +452,26 @@ li:last-child {
   font-size: 0.9em;
   margin-left: 8px;
 }
+.status-acted {
+  color: #27ae60;
+  font-size: 0.85em;
+  margin-left: 8px;
+}
+.status-surge {
+  color: #f39c12;
+  font-weight: bold;
+  font-size: 0.85em;
+  margin-left: 8px;
+  animation: pulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes pulse {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+.member-actions.acted {
+  opacity: 0.6;
+  border-color: rgba(39, 174, 96, 0.3);
+}
 .btn-ability:disabled {
   opacity: 0.6;
 }
@@ -1120,6 +1140,23 @@ li:last-child {
   padding: 16px 32px;
   font-size: 1.2em;
   margin-top: 16px;
+}
+
+.btn-restart {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: white;
+  padding: 16px 32px;
+  font-size: 1.2em;
+  margin-top: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-restart:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
 }
 
 /* Trap UI */

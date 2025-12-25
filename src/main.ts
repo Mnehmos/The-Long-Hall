@@ -1,6 +1,6 @@
 import { createInitialRunState, loadGameState, saveGameState, clearGameState } from './engine/state';
 import { gameReducer } from './engine/reducer';
-import { renderGame, setSelectedPartyIndex, getSelectedPartyIndex, setCachedHighScores } from './ui/render';
+import { renderGame, setCachedHighScores } from './ui/render';
 import type { Action } from './engine/types';
 import { apiClient } from './api/client';
 import { renderLeaderboard } from './ui/leaderboard';
@@ -26,25 +26,6 @@ async function start() {
     }
     
     update();
-    
-    // Arrow key navigation for party selection
-    document.addEventListener('keydown', handleArrowNavigation);
-}
-
-function handleArrowNavigation(e: KeyboardEvent) {
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        const partySize = state.party.members.length;
-        if (partySize === 0) return;
-        
-        let current = getSelectedPartyIndex();
-        if (e.key === 'ArrowLeft') {
-            current = (current - 1 + partySize) % partySize;
-        } else {
-            current = (current + 1) % partySize;
-        }
-        setSelectedPartyIndex(current);
-        update();
-    }
 }
 
 function update() {
@@ -92,16 +73,6 @@ function dispatch(action: Action) {
 }
 
 function attachEvents() {
-  // Party sidebar click-to-select
-  document.querySelectorAll('.sidebar-member').forEach(tile => {
-      tile.addEventListener('click', (e) => {
-          const el = e.currentTarget as HTMLElement;
-          const idx = parseInt(el.getAttribute('data-party-index') || '0', 10);
-          setSelectedPartyIndex(idx);
-          update();
-      });
-  });
-
   document.getElementById('btn-advance')?.addEventListener('click', () => {
     dispatch({ type: 'ADVANCE_ROOM' });
   });
@@ -111,9 +82,9 @@ function attachEvents() {
   });
 
   document.getElementById('btn-rest')?.addEventListener('click', () => {
-      // Heal first member for now (simplified)
-      const heroId = state.party.members[0].id;
-      dispatch({ type: 'TAKE_SHORT_REST', actorIdsToHeal: [heroId] });
+      // Heal all alive party members
+      const aliveIds = state.party.members.filter(m => m.isAlive).map(m => m.id);
+      dispatch({ type: 'TAKE_SHORT_REST', actorIdsToHeal: aliveIds });
   });
   
   // Equip buttons - select party member
@@ -216,6 +187,11 @@ function attachEvents() {
   // Victory continue
   document.getElementById('btn-continue')?.addEventListener('click', () => {
       dispatch({ type: 'DISMISS_POPUP' });
+  });
+
+  // Restart button on game over
+  document.getElementById('btn-restart')?.addEventListener('click', () => {
+      dispatch({ type: 'START_RUN', seed: Date.now().toString() });
   });
   
   
