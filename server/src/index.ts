@@ -35,7 +35,7 @@ declare global {
 
 // Routes
 app.use('/api/saves', requireAuth(), savesRouter);
-app.use('/api/scores', requireAuth(), scoresRouter);
+app.use('/api/scores', scoresRouter); // Auth applied at route level
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {

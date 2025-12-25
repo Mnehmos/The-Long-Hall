@@ -67,12 +67,21 @@ function dispatch(action: Action) {
   // Clear save on game over (party death)
   if (state.gameOver) {
     clearGameState();
-    // Submit score on death
+    // Submit score on death and refresh high scores
     (async () => {
         const token = await getToken();
         if (token) {
-            await apiClient.submitScore(token, state);
+            console.log('Submitting score... Depth:', state.depth, 'Gold:', state.party.gold);
+            const success = await apiClient.submitScore(token, state);
+            console.log('Score submission:', success ? 'SUCCESS' : 'FAILED');
+        } else {
+            console.log('Not logged in - score not submitted');
         }
+        // Always refresh high scores on game over (even if not logged in)
+        const scores = await apiClient.getHighScores();
+        console.log('Fetched high scores:', scores.length, 'entries');
+        setCachedHighScores(scores);
+        update(); // Re-render with updated scores
     })();
   } else {
     saveGameState(state);

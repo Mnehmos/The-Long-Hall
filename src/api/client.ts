@@ -2,6 +2,7 @@ import type { RunState } from '../engine/types';
 
 // Use environment variable or default to production URL
 const API_URL = import.meta.env.VITE_API_URL || 'https://the-long-hall-production.up.railway.app';
+const API_BASE = `${API_URL}/api`; // All routes are under /api
 
 export interface ScoreEntry {
   user_id: string;
@@ -13,7 +14,7 @@ export interface ScoreEntry {
 export const apiClient = {
   async saveGame(token: string, state: RunState): Promise<{ success: boolean; hash?: string }> {
     try {
-      const response = await fetch(`${API_URL}/saves`, {
+      const response = await fetch(`${API_BASE}/saves`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -32,7 +33,7 @@ export const apiClient = {
 
   async loadGame(token: string): Promise<RunState | null> {
     try {
-      const response = await fetch(`${API_URL}/saves`, {
+      const response = await fetch(`${API_BASE}/saves`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -51,7 +52,7 @@ export const apiClient = {
 
   async submitScore(token: string, state: RunState): Promise<boolean> {
     try {
-      const response = await fetch(`${API_URL}/scores`, {
+      const response = await fetch(`${API_BASE}/scores`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,7 +70,7 @@ export const apiClient = {
 
   async getHighScores(limit = 10): Promise<ScoreEntry[]> {
     try {
-        const response = await fetch(`${API_URL}/scores?limit=${limit}`);
+        const response = await fetch(`${API_BASE}/scores?limit=${limit}`);
         if (!response.ok) return [];
         return await response.json();
     } catch (error) {

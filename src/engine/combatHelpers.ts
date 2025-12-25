@@ -89,6 +89,7 @@ export function resolveEnemyTurn(state: RunState): RunState {
         party: { ...nextState.party, members: membersWithCooldowns },
         history: [...newHistory, `━━━ ROUND ${newRound} ━━━`],
         combatTurn: 'player',
-        combatRound: newRound
+        combatRound: newRound,
+        actedThisRound: [] // Reset for new round
     };
 }

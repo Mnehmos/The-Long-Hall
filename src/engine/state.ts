@@ -80,6 +80,7 @@ export function createInitialRunState(seed: string): RunState {
     roomResolved: false, // Shrine needs to be resolved (prayed at)
     combatTurn: null,
     combatRound: 0,
+    actedThisRound: [],
     extraActions: 0,
     gameOver: false,
     victory: false,

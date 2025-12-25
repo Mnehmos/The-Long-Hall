@@ -26,8 +26,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/scores - Submit score
-router.post('/', async (req, res) => {
+// POST /api/scores - Submit score (protected)
+router.post('/', requireAuth(), async (req, res) => {
   const { userId } = req.auth;
   const { runData } = req.body;
 

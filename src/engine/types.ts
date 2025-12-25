@@ -173,6 +173,7 @@ export interface RunState {
   // Combat state
   combatTurn: 'player' | 'enemy' | null;
   combatRound: number; // Current round in combat
+  actedThisRound: string[]; // IDs of party members who have acted this round
   extraActions: number; // Extra actions granted (e.g., from Action Surge)
   // Game end states
   gameOver: boolean;
@@ -193,6 +194,7 @@ export type Action =
   | { type: 'PRAY_AT_SHRINE' }
   | { type: 'DISMISS_POPUP' }
   | { type: 'BUY_ITEM'; itemId: string; cost: number } 
+  | { type: 'SELL_ITEM'; itemId: string } 
   | { type: 'EQUIP_ITEM'; actorId: string; itemId: string; slot?: EquipmentSlot }
   | { type: 'HIRE_RECRUIT'; recruitId: string }
   | { type: 'ESCAPE' }

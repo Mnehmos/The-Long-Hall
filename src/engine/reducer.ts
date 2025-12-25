@@ -99,14 +99,28 @@ export function gameReducer(state: RunState, action: Action): RunState {
         const newDepth = state.depth + 1;
         const rng = new SeededRNG(hashWithSeed(state.seed, newDepth));
         
+        // Remove dead party members before advancing (they're gone forever)
+        const survivingMembers = state.party.members.filter(m => m.isAlive);
+        
         // Generate the room immediately and store it
-        const room = generateRoom({ ...state, depth: newDepth }, rng);
+        const room = generateRoom({ ...state, depth: newDepth, party: { ...state.party, members: survivingMembers } }, rng);
         
         // Increment weapon encounter counts if entering combat
         const isCombat = room.type === 'combat' || room.type === 'elite';
         const updatedMembers = isCombat
-            ? incrementWeaponEncounters(state.party.members)
-            : state.party.members;
+            ? incrementWeaponEncounters(survivingMembers)
+            : survivingMembers;
+
+        // Build history
+        const newHistory = [...state.history];
+        const deadNames = state.party.members.filter(m => !m.isAlive).map(m => m.name);
+        if (deadNames.length > 0) {
+            newHistory.push(`☠️ ${deadNames.join(', ')} left behind forever...`);
+        }
+        newHistory.push(`Entered room ${newDepth}: ${room.type.toUpperCase()}`);
+        if (isCombat) {
+            newHistory.push('━━━ ROUND 1 ━━━');
+        }
 
         let nextState: RunState = {
           ...state,
@@ -115,14 +129,11 @@ export function gameReducer(state: RunState, action: Action): RunState {
           roomResolved: room.type !== 'combat' && room.type !== 'elite' && room.type !== 'hazard' && room.type !== 'shrine' && room.type !== 'trader',
           combatTurn: isCombat ? 'player' : null,
           combatRound: isCombat ? 1 : 0,
+          actedThisRound: [], // Reset for new combat
           extraActions: 0, // Reset extra actions on room enter
           victory: false, // Reset victory flag on room enter
           party: { ...state.party, members: updatedMembers },
-          history: [
-            ...state.history,
-            `Entered room ${newDepth}: ${room.type.toUpperCase()}`,
-            ...(isCombat ? ['━━━ ROUND 1 ━━━'] : [])
-          ],
+          history: newHistory,
         };
 
         // Long rest at segment boundaries
@@ -210,7 +221,7 @@ export function gameReducer(state: RunState, action: Action): RunState {
         let newEnemies = [...room.enemies];
         let newParty = { ...state.party };
         let roomResolved = false;
-        let combatTurn: 'player' | 'enemy' | null = 'enemy'; // Enemy turn next
+        let newActedThisRound = [...(state.actedThisRound || []), action.attackerId]; // Track this attacker
         
         if (hit) {
             // Damage roll: 1d8 + skill + weapon
@@ -327,13 +338,13 @@ export function gameReducer(state: RunState, action: Action): RunState {
             const goldReward = Math.floor(5 + Math.random() * 11);
             newHistory.push(`Victory! All enemies defeated. +${goldReward} gold.`);
             roomResolved = true;
-            combatTurn = null;
             // Set victory flag for popup
             return {
                 ...state,
                 currentRoom: { ...room, enemies: newEnemies },
                 roomResolved: true,
                 combatTurn: null,
+                actedThisRound: [],
                 victory: true,
                 history: newHistory,
                 party: { 
@@ -343,6 +354,13 @@ export function gameReducer(state: RunState, action: Action): RunState {
             };
         }
         
+        // Determine if all alive party members have acted
+        const aliveMemberIds = newParty.members.filter(m => m.isAlive).map(m => m.id);
+        const allActed = aliveMemberIds.every(id => newActedThisRound.includes(id));
+        
+        // Default: stay on player turn until all have acted
+        let combatTurn: 'player' | 'enemy' | null = allActed ? 'enemy' : 'player';
+        
         // Check if player has extra actions (e.g., from Action Surge)
         let newExtraActions = state.extraActions;
         if (combatTurn === 'enemy' && state.extraActions > 0) {
@@ -351,12 +369,21 @@ export function gameReducer(state: RunState, action: Action): RunState {
             combatTurn = 'player';
             newHistory.push(`(Extra action used! ${newExtraActions > 0 ? newExtraActions + ' remaining' : 'Turn ends after this.'})`);
         }
+        
+        // If still more party members to act, show who's next
+        if (combatTurn === 'player' && !allActed) {
+            const nextToAct = newParty.members.find(m => m.isAlive && !newActedThisRound.includes(m.id));
+            if (nextToAct) {
+                newHistory.push(`→ ${nextToAct.name}'s turn`);
+            }
+        }
 
         let nextState: RunState = {
             ...state,
             currentRoom: { ...room, enemies: newEnemies },
             roomResolved,
             combatTurn,
+            actedThisRound: combatTurn === 'enemy' ? [] : newActedThisRound, // Reset if going to enemy turn
             history: newHistory,
             party: newParty,
             extraActions: newExtraActions
@@ -402,6 +429,37 @@ export function gameReducer(state: RunState, action: Action): RunState {
                 items: [...state.inventory.items, item]
             },
             history: [...state.history, `Bought ${item.name}`]
+        };
+    }
+
+    case 'SELL_ITEM': {
+        // Find the item in inventory
+        const itemIndex = state.inventory.items.findIndex(i => i.id === action.itemId);
+        if (itemIndex === -1) {
+            return {
+                ...state,
+                history: [...state.history, "Item not found in inventory."]
+            };
+        }
+        
+        const item = state.inventory.items[itemIndex];
+        const sellPrice = 10; // Flat rate for all items
+        
+        // Remove item from inventory
+        const newItems = [...state.inventory.items];
+        newItems.splice(itemIndex, 1);
+        
+        return {
+            ...state,
+            party: {
+                ...state.party,
+                gold: state.party.gold + sellPrice
+            },
+            inventory: {
+                ...state.inventory,
+                items: newItems
+            },
+            history: [...state.history, `Sold ${item.name} for ${sellPrice} gold`]
         };
     }
 
