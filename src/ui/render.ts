@@ -4,6 +4,48 @@ import { getAbilityById } from '../content/abilities';
 import { getEnemyArt, getHeroArt, renderHpBar, renderStatBar, EQUIPMENT_ICONS } from '../content/art';
 import { RECRUITS, ITEMS } from '../content/tables';
 import { calculateEscapeDC } from '../engine/generateRoom';
+import type { ScoreEntry } from '../api/client';
+
+// UI State (not game state - just for navigation)
+let selectedPartyIndex = 0;
+let cachedHighScores: ScoreEntry[] = [];
+
+export function setSelectedPartyIndex(index: number) {
+  selectedPartyIndex = index;
+}
+
+export function getSelectedPartyIndex(): number {
+  return selectedPartyIndex;
+}
+
+export function setCachedHighScores(scores: ScoreEntry[]) {
+  cachedHighScores = scores;
+}
+
+function renderHighScoresPanel(): string {
+  let html = `<div class="highscores-panel">
+    <h3>🏆 High Scores</h3>`;
+  
+  if (cachedHighScores.length === 0) {
+    html += `<div class="highscores-empty">No scores yet!<br/>Be the first!</div>`;
+  } else {
+    html += `<ul class="highscores-list">`;
+    cachedHighScores.slice(0, 10).forEach((score, i) => {
+      const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      const displayName = `User ${score.user_id.slice(-4)}`;
+      html += `
+        <li class="highscore-entry">
+          <span class="highscore-rank ${rankClass}">#${i + 1}</span>
+          <span class="highscore-name">${displayName}</span>
+          <span class="highscore-score">${score.score}</span>
+        </li>`;
+    });
+    html += `</ul>`;
+  }
+  
+  html += `</div>`;
+  return html;
+}
 
 function formatItemStats(item: Item, showMastery: boolean = false): string {
     let parts = [`Cost: ${item.cost}g`];
@@ -123,10 +165,8 @@ function renderSidebar(state: RunState): string {
       </pre>
     </div>`;
 
-    for (const member of state.party.members) {
-
+    state.party.members.forEach((member, index) => {
         // XP Bar
-        // We need lookup for accurate bar? Re-use logic.
         const XP_THRESHOLDS = [0, 50, 150, 300, 500, 800, 1200];
         const nextXp = member.level < XP_THRESHOLDS.length - 1 ? XP_THRESHOLDS[member.level] : XP_THRESHOLDS[XP_THRESHOLDS.length - 1];
         
@@ -138,8 +178,12 @@ function renderSidebar(state: RunState): string {
             return '•';
         }).join('') || '';
 
+        const isSelected = index === selectedPartyIndex;
+        const selectedClass = isSelected ? 'selected' : '';
+        const deadClass = !member.isAlive ? 'dead' : '';
+
         html += `
-        <div class="sidebar-member ${!member.isAlive ? 'dead' : ''}">
+        <div class="sidebar-member ${deadClass} ${selectedClass}" data-party-index="${index}">
             <div class="sidebar-name">${member.name} <span style="float:right">${member.isAlive ? 'Lv.'+member.level : 'DEAD'}</span></div>
             <div class="sidebar-status-ascii">
  HP [${hpBar}]
@@ -147,7 +191,10 @@ function renderSidebar(state: RunState): string {
  ${statusIcons}
             </div>
         </div>`;
-    }
+    });
+    
+    // Navigation hint
+    html += `<div class="party-nav-hint"><kbd>←</kbd> <kbd>→</kbd> Navigate</div>`;
     
     html += `</div>`;
     return html;
@@ -609,6 +656,9 @@ export function renderGame(state: RunState): string {
       </div>
     </div>
   `;
+
+  // High Scores Panel (rightmost column)
+  html += renderHighScoresPanel();
 
   return html;
 }
