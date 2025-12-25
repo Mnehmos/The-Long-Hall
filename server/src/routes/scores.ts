@@ -43,19 +43,36 @@ router.post('/', requireAuth(), async (req, res) => {
 
   try {
     // Anti-Cheat: Calculate score from runData on server
-    // We import this dynamically or assume it's available from the shared engine code
-    // Since we copied it to ../engine/score.js (transpiled), we can use it.
-    // Note: We need to use dynamic import or ensure paths are correct.
     const { calculateScore } = await import('../engine/score.js');
     const calculatedScore = calculateScore(runData);
 
-    await pool.query(
-      `INSERT INTO scores (user_id, score, run_data)
-       VALUES ($1, $2, $3)`,
-      [userId, calculatedScore, runData]
+    // Check if user already has a score
+    const existing = await pool.query(
+      `SELECT id, score FROM scores WHERE user_id = $1`,
+      [userId]
     );
 
-    res.json({ success: true, score: calculatedScore });
+    if (existing.rows.length > 0) {
+      // Only update if new score is higher
+      if (calculatedScore > existing.rows[0].score) {
+        await pool.query(
+          `UPDATE scores SET score = $1, run_data = $2, created_at = CURRENT_TIMESTAMP WHERE user_id = $3`,
+          [calculatedScore, runData, userId]
+        );
+        res.json({ success: true, score: calculatedScore, newHighScore: true });
+      } else {
+        // Score not higher, don't update
+        res.json({ success: true, score: calculatedScore, newHighScore: false, currentBest: existing.rows[0].score });
+      }
+    } else {
+      // First score for this user
+      await pool.query(
+        `INSERT INTO scores (user_id, score, run_data)
+         VALUES ($1, $2, $3)`,
+        [userId, calculatedScore, runData]
+      );
+      res.json({ success: true, score: calculatedScore, newHighScore: true });
+    }
   } catch (error) {
     console.error('Error submitting score:', error);
     res.status(500).json({ error: 'Internal server error' });

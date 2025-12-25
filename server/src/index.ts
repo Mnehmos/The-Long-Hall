@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { clerkMiddleware, requireAuth } from '@clerk/express';
 import { pool } from './db/index.js';
+import { initializeDatabase } from './db/init.js';
 import savesRouter from './routes/saves.js';
 import scoresRouter from './routes/scores.js';
 
@@ -14,6 +15,7 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(clerkMiddleware());
 
 // Public health check
 app.get('/health', (req, res) => {
@@ -43,6 +45,14 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
   res.status(500).send('Something broke!');
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+// Initialize database and start server
+initializeDatabase()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  });
