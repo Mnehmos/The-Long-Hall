@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { clerkMiddleware, requireAuth } from '@clerk/express';
-import { pool } from './db.js';
+import { pool } from './db/index.js';
 import savesRouter from './routes/saves.js';
 import scoresRouter from './routes/scores.js';
 
